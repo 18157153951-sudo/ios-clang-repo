@@ -155,13 +155,16 @@ def build_stub_deb(name, fields, out_path):
     return control_text
 
 
-def repack_deb(src_deb, out_deb, extra_control):
+def repack_deb(src_deb, out_deb, extra_control, prune=None):
     """Rewrite a Procursus deb: fix Architecture, drop version constraints."""
     tree = os.path.join(WORK, os.path.basename(out_deb))
     shutil.rmtree(tree, ignore_errors=True)
     os.makedirs(tree, exist_ok=True)
 
     subprocess.run(["dpkg-deb", "-R", src_deb, tree], check=True)
+
+    if prune is not None:
+        prune(tree)
 
     control_path = os.path.join(tree, "DEBIAN", "control")
     keep = []
@@ -183,6 +186,54 @@ def repack_deb(src_deb, out_deb, extra_control):
         ["dpkg-deb", "--root-owner-group", "-Zgzip", "-b", tree, out_deb],
         check=True,
     )
+
+
+# libclang-common-16-dev is ~294 MB installed, but almost all of that is
+# compiler-rt: fuzzer, asan/tsan/ubsan, xray, orc and profile runtimes that a
+# phone building tweaks never links. Only clang's builtin headers and the plain
+# builtins archives are needed.
+DROP_TOKENS = (
+    "fuzzer", "orc_rt", "xray", "asan", "tsan", "ubsan", "lsan", "msan",
+    "hwasan", "dfsan", "scudo", "cfi", "profile", "stats", "interception",
+    "memprof",
+)
+
+
+def prune_clang_common(tree):
+    clang_lib_prefix = os.path.join(tree, "var/jb/usr/lib/llvm-16/lib/clang") + os.sep
+
+    removed = 0
+    freed = 0
+
+    for root, _, files in os.walk(tree):
+        for name in files:
+            full = os.path.join(root, name)
+            rel = os.path.relpath(full, tree).replace(os.sep, "/")
+
+            if not rel.startswith("var/jb/usr/lib/llvm-16/"):
+                continue
+
+            parts = rel.split("/")
+            keep = False
+            if full.startswith(clang_lib_prefix):
+                # .../lib/clang/16.0.0/include/...  -> always keep (builtin headers)
+                # .../lib/clang/16.0.0/lib/...      -> keep only the plain builtins
+                is_include = len(parts) > 8 and parts[8] == "include"
+                keep = is_include or not any(token in name.lower() for token in DROP_TOKENS)
+
+            if keep:
+                continue
+
+            freed += os.path.getsize(full)
+            os.remove(full)
+            removed += 1
+
+    print("      精简：移除 %d 个文件，省下 %.1f MB" % (removed, freed / 1048576.0))
+
+
+PRUNE = {
+    "libclang-common-16-dev": prune_clang_common,
+}
 
 
 def control_fields(deb_path):
@@ -231,7 +282,7 @@ def main():
 
         out_name = "%s_%s_%s.deb" % (name, fields["Version"], TARGET_ARCH)
         out_path = os.path.join(POOL, out_name)
-        repack_deb(raw_path, out_path, deps)
+        repack_deb(raw_path, out_path, deps, PRUNE.get(name))
 
         entries.append((out_name, control_fields(out_path)))
         print("  %-24s %-26s %8.1f KB" % (name, fields["Version"], os.path.getsize(out_path) / 1024.0))

@@ -42,6 +42,9 @@ https://18157153951-sudo.github.io/ios-clang-repo/
 1. **架构改为 `iphoneos-arm64e`** —— 设备的原生架构是 arm64e，Procursus 的包声明的是 `iphoneos-arm64`，不改会被 dpkg 拒绝。二进制本身是 arm64，在 arm64e 设备上原生运行。
 2. **依赖去掉版本约束** —— 可达的源不一定有 Procursus 要求的精确版本，只保留包名。
 3. **压缩改为 gzip** —— 避免旧版 dpkg 不认 zstd。
+4. **精简 `libclang-common-16-dev`** —— 原包安装后占 294 MB，其中 272 MB 是 compiler-rt 的 fuzzer / asan / tsan / ubsan / xray / orc 运行时，手机上编译 tweak 根本不会链接到。只保留 clang 的内建头文件（`lib/clang/16.0.0/include/`）和普通 builtins 静态库，下载从 75 MB 降到约 2 MB、安装占用从 294 MB 降到约 9 MB。
+
+> 若之前装过完整版，可以用 `apt reinstall libclang-common-16-dev` 换成精简版以释放空间。
 
 ## 构建方式
 
