@@ -1,0 +1,45 @@
+name: Build apt repo
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Debs are pulled straight from Procursus by the runner, so nothing large
+      # has to be committed here.
+      - name: Build repository
+        run: python3 tools/build_repo.py
+
+      - name: Show repository layout
+        run: |
+          echo "== Packages =="
+          head -n 40 site/Packages
+          echo "== debs =="
+          ls -lh site/debs/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Report published URL
+        run: echo "published to ${{ steps.deployment.outputs.page_url }}"
