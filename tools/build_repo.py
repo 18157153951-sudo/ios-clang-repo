@@ -216,6 +216,7 @@ def main():
     shutil.rmtree(SITE, ignore_errors=True)
     shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(POOL, exist_ok=True)
+    os.makedirs(WORK, exist_ok=True)
 
     print("拉取 Procursus 索引…")
     index = parse_index(lzma.decompress(fetch(INDEX_URL)).decode("utf-8", "replace"))
