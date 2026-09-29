@@ -33,6 +33,10 @@ WORK = "build"
 
 # package -> rewritten Depends (version constraints dropped: the reachable
 # repos do not always carry the exact versions Procursus asked for)
+#
+# `clang` and `libc++-dev` look like metapackages but they carry the important
+# symlinks (/usr/bin/clang -> clang-16, /usr/include/c++ -> ...), so they must
+# be the real Procursus packages rather than hand-written stubs.
 DEPS = {
     "clang-16": "libiosexec1, libllvm16, libclang-cpp16, ld64, "
                 "libclang-common-16-dev, libc++-16-dev, build-essential",
@@ -40,28 +44,13 @@ DEPS = {
     "libclang-cpp16": "libllvm16",
     "libclang-common-16-dev": "",
     "libc++-16-dev": "libllvm16",
+    "clang": "clang-16, libc++-dev",
+    "libc++-dev": "libc++-16-dev",
 }
 
-# stubs we author ourselves
+# stubs we author ourselves: the roothide mirror's ld64 and odcctools both
+# depend on llvm-dev, which no reachable repo ships.
 STUBS = {
-    "clang": {
-        "Version": "16.0.0",
-        "Architecture": TARGET_ARCH,
-        "Depends": "clang-16, libc++-dev",
-        "Description": "metapackage pulling in clang 16 (roothide compatible)",
-        "Section": "Development",
-        "Maintainer": "ios-clang-repo",
-        "Name": "clang",
-    },
-    "libc++-dev": {
-        "Version": "16.0.0",
-        "Architecture": TARGET_ARCH,
-        "Depends": "libc++-16-dev",
-        "Description": "metapackage pulling in libc++ 16 headers",
-        "Section": "Development",
-        "Maintainer": "ios-clang-repo",
-        "Name": "libc++-dev",
-    },
     "llvm-dev": {
         "Version": "16.0.0",
         "Architecture": TARGET_ARCH,

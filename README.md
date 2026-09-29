@@ -31,9 +31,11 @@ https://18157153951-sudo.github.io/ios-clang-repo/
 | `libclang-cpp16` | Procursus 重打包 | clang C++ 接口库 |
 | `libclang-common-16-dev` | Procursus 重打包 | clang 内建头文件与 compiler-rt |
 | `libc++-16-dev` | Procursus 重打包 | libc++ 头文件 |
-| `clang` | 自建存根 | 满足 `theos-dependencies` 对 `clang` 的依赖 |
-| `libc++-dev` | 自建存根 | 满足 `clang` 对 `libc++-dev` 的依赖 |
+| `clang` | Procursus 重打包 | 提供 `/usr/bin/clang -> clang-16`、`cc`、`c++`、`clang++` 等关键符号链接 |
+| `libc++-dev` | Procursus 重打包 | 提供 `/usr/include/c++` 符号链接 |
 | `llvm-dev` | 自建存根 | 解开 roothide 源里 `ld64` / `odcctools` 的依赖死结 |
+
+> `clang` 和 `libc++-dev` 名字看起来像元包，体积也只有几 KB，但它们承载了 `/usr/bin/clang`、`/usr/include/c++` 这些关键符号链接，所以必须用原包重打包，不能自行造存根。
 
 ## 重打包做了什么
 
