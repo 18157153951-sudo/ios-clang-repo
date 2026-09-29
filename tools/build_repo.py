@@ -44,8 +44,29 @@ DEPS = {
     "libclang-cpp16": "libllvm16",
     "libclang-common-16-dev": "",
     "libc++-16-dev": "libllvm16",
-    "clang": "clang-16, libc++-dev",
     "libc++-dev": "libc++-16-dev",
+}
+
+# The Procursus `clang` package ships symlinks for cc, c++, clang, clang++ and
+# clang-cpp. Rebuilding it verbatim is risky: cc and c++ often already exist in
+# a jailbreak bootstrap and dpkg refuses to overwrite another package's files.
+# We only need clang/clang++, so this minimal package creates just those and
+# depends on nothing but clang-16.
+LINK_PACKAGES = {
+    "clang": {
+        "Version": "16.0.0~5.9.2~RELEASE-1",
+        "Architecture": TARGET_ARCH,
+        "Depends": "clang-16",
+        "Provides": "c-compiler, objc-compiler, c++-compiler",
+        "Description": "metapackage creating /usr/bin/clang and /usr/bin/clang++",
+        "Section": "Development",
+        "Maintainer": "ios-clang-repo",
+        "Name": "clang",
+        "links": [
+            ("var/jb/usr/bin/clang", "clang-16"),
+            ("var/jb/usr/bin/clang++", "clang++-16"),
+        ],
+    },
 }
 
 # stubs we author ourselves: the roothide mirror's ld64 and odcctools both
@@ -236,6 +257,48 @@ PRUNE = {
 }
 
 
+def build_link_deb(name, fields, out_path):
+    """Create a package whose payload is a couple of symlinks."""
+    os.makedirs(WORK, exist_ok=True)
+    control_dir = os.path.join(WORK, "link-" + name)
+    shutil.rmtree(control_dir, ignore_errors=True)
+    os.makedirs(control_dir)
+
+    lines = ["Package: %s" % name]
+    for key in ["Name", "Version", "Architecture", "Maintainer", "Section",
+                "Description", "Depends", "Provides"]:
+        value = fields.get(key)
+        if value:
+            lines.append("%s: %s" % (key, value))
+    with open(os.path.join(control_dir, "control"), "w") as handle:
+        handle.write("\n".join(lines) + "\n")
+
+    control_tar = os.path.join(WORK, "control-link-%s.tar.gz" % name)
+    with tarfile.open(control_tar, "w:gz") as tar:
+        tar.add(os.path.join(control_dir, "control"), arcname="./control")
+
+    data_tar = os.path.join(WORK, "data-link-%s.tar.gz" % name)
+    with tarfile.open(data_tar, "w:gz") as tar:
+        for path, target in fields["links"]:
+            info = tarfile.TarInfo("./" + path)
+            info.type = tarfile.SYMTYPE
+            info.linkname = target
+            info.mode = 0o777
+            tar.addfile(info)
+
+    with open(control_tar, "rb") as handle:
+        control_blob = handle.read()
+    with open(data_tar, "rb") as handle:
+        data_blob = handle.read()
+
+    write_ar(out_path, [
+        ("debian-binary", b"2.0\n"),
+        ("control.tar.gz", control_blob),
+        ("data.tar.gz", data_blob),
+    ])
+    return control_blob
+
+
 def control_fields(deb_path):
     text = subprocess.run(
         ["dpkg-deb", "-f", deb_path], check=True, capture_output=True, text=True
@@ -286,6 +349,14 @@ def main():
 
         entries.append((out_name, control_fields(out_path)))
         print("  %-24s %-26s %8.1f KB" % (name, fields["Version"], os.path.getsize(out_path) / 1024.0))
+
+    for name, fields in LINK_PACKAGES.items():
+        out_name = "%s_%s_%s.deb" % (name, fields["Version"], TARGET_ARCH)
+        out_path = os.path.join(POOL, out_name)
+        build_link_deb(name, fields, out_path)
+        entries.append((out_name, control_fields(out_path)))
+        print("  %-24s %-26s %8.1f KB (符号链接)" % (
+            name, fields["Version"], os.path.getsize(out_path) / 1024.0))
 
     for name, fields in STUBS.items():
         out_name = "%s_%s_%s.deb" % (name, fields["Version"], TARGET_ARCH)
