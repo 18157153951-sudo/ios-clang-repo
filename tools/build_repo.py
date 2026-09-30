@@ -153,14 +153,14 @@ def build_stub_deb(name, fields, out_path):
         handle.write(control_text)
 
     control_tar = os.path.join(WORK, "control-%s.tar.gz" % name)
-    with tarfile.open(control_tar, "w:gz") as tar:
+    with tarfile.open(control_tar, "w:gz", format=tarfile.GNU_FORMAT) as tar:
         tar.add(os.path.join(control_dir, "control"), arcname="./control")
 
     data_dir = os.path.join(WORK, "stub-data-" + name)
     shutil.rmtree(data_dir, ignore_errors=True)
     os.makedirs(data_dir)
     data_tar = os.path.join(WORK, "data-%s.tar.gz" % name)
-    with tarfile.open(data_tar, "w:gz") as tar:
+    with tarfile.open(data_tar, "w:gz", format=tarfile.GNU_FORMAT) as tar:
         tar.add(data_dir, arcname=".")
 
     with open(control_tar, "rb") as handle:
@@ -274,11 +274,11 @@ def build_link_deb(name, fields, out_path):
         handle.write("\n".join(lines) + "\n")
 
     control_tar = os.path.join(WORK, "control-link-%s.tar.gz" % name)
-    with tarfile.open(control_tar, "w:gz") as tar:
+    with tarfile.open(control_tar, "w:gz", format=tarfile.GNU_FORMAT) as tar:
         tar.add(os.path.join(control_dir, "control"), arcname="./control")
 
     data_tar = os.path.join(WORK, "data-link-%s.tar.gz" % name)
-    with tarfile.open(data_tar, "w:gz") as tar:
+    with tarfile.open(data_tar, "w:gz", format=tarfile.GNU_FORMAT) as tar:
         for path, target in fields["links"]:
             info = tarfile.TarInfo("./" + path)
             info.type = tarfile.SYMTYPE
